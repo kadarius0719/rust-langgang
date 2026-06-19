@@ -92,3 +92,16 @@ async fn history_round_trips_through_a_store() {
     assert_eq!(resumed, history);
     assert_eq!(resumed.messages().len(), 2);
 }
+
+#[test]
+fn history_serde_round_trips() {
+    // Bring-your-own-storage: serialize the whole transcript to JSON and back.
+    let mut history = ChatHistory::new();
+    history.user("hi").assistant("hello");
+
+    let json = serde_json::to_string(&history).unwrap();
+    let restored: ChatHistory = serde_json::from_str(&json).unwrap();
+
+    assert_eq!(restored, history);
+    assert_eq!(restored.messages().len(), 2);
+}

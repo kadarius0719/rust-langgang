@@ -37,7 +37,9 @@ or failing tools are fed back to the model rather than crashing the run.
 
 **Conversation memory** — `ChatHistory` owns the transcript; `ChatStore`
 (`InMemoryChatStore` built in) persists it for save/resume by session id, with
-the same async, object-safe shape as `TraceStore`.
+the same async, object-safe shape as `TraceStore`. All domain types are
+`serde`-serializable, so you can also bring your own storage
+(Postgres/Dynamo/files) with no trait to implement — see [USAGE.md](USAGE.md).
 
 **Composition (Runnable)** — compose functions, models, and parsers into
 reusable pipelines: typed `.then()`, `parallel`/`parallel_map` fan-out, `Branch`

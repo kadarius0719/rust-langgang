@@ -20,6 +20,8 @@ use std::collections::HashMap;
 use std::future::Future;
 use std::sync::{Arc, Mutex};
 
+use serde::{Deserialize, Serialize};
+
 use crate::{
     error::Result,
     message::Message,
@@ -29,7 +31,11 @@ use crate::{
 };
 
 /// An owned, ordered conversation transcript.
-#[derive(Debug, Clone, Default, PartialEq)]
+///
+/// It is `serde`-serializable, so you can persist it directly to any store you
+/// choose (or serialize [`messages`](Self::messages) for a plain array). See the
+/// "Persistence" section of `USAGE.md` for the bring-your-own-storage patterns.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct ChatHistory {
     messages: Vec<Message>,
 }

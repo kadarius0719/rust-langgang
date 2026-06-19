@@ -207,28 +207,134 @@ let recipe: Recipe = model
 
 ## Conversation memory
 
-`ChatHistory` holds the running transcript; `ChatStore` persists it across runs
-(save/resume by session id), with an in-memory backend built in.
+`ChatHistory` is an owned transcript with ergonomic helpers — `user`/`assistant`,
+`record_response` (append the model's reply), and `to_request(model)` (a builder
+pre-loaded with the messages).
+
+```rust
+use ai_core::{ChatHistory, ChatModel};
+
+let mut history = ChatHistory::new();
+history.user("Remember my name is Ada.");
+let response = model.chat(history.to_request("llama3.1").build()?).await?;
+history.record_response(&response);
+```
+
+## Persistence: store data your way
+
+The crate **never owns your data store** — it hands you serde-serializable values
+and takes them straight back. Every domain type (`Message`, `ChatHistory`,
+`ChatResponse`, `TraceEvent`, …) is `Serialize`/`Deserialize`, so you persist
+them in *any* backend (Postgres JSONB, DynamoDB, a graph node, a file) and reload
+to resume. This works on default features — your storage choice is fully
+decoupled from the provider/HTTP/schema features. There are two ways; pick per
+use case.
+
+### Option A — bring your own storage (DIY serde)
+
+**When:** you already have a database/ORM and want full control of the schema and
+queries, with no trait to implement.
+
+```rust
+// Save — serialize and store however you like.
+let blob = serde_json::to_string(&history)?;            // the whole transcript ...
+// let blob = serde_json::to_string(history.messages())?;  // ... or a plain Message array
+my_db.put("session-42", &blob).await?;                  // Postgres / Dynamo / graph / file
+
+// Resume in a later run — load, deserialize, continue.
+let mut history: ChatHistory = serde_json::from_str(&my_db.get("session-42").await?)?;
+history.user("continue where we left off");
+let response = model.chat(history.to_request("llama3.1").build()?).await?;
+history.record_response(&response);
+```
+
+**Why:** zero coupling. The crate imposes nothing about *where* or *how* you
+store — it just round-trips plain JSON (or any serde format) through your code.
+
+### Option B — the `ChatStore` trait
+
+**When:** you want a uniform `load`/`save`/`append`/`clear` interface across the
+app, the ability to swap backends without touching call sites, and an in-memory
+default for tests.
 
 ```rust
 use ai_core::{ChatHistory, ChatModel, ChatStore, InMemoryChatStore};
 
-let store = InMemoryChatStore::new();
-
-// Resume (or start) a session.
-let mut history = ChatHistory::from_messages(store.load("user-42").await?);
+let store = InMemoryChatStore::new();              // swap for your backend impl
+let mut history = ChatHistory::from_messages(store.load("user-42").await?);  // resume
 history.user("What did we discuss last time?");
-
 let response = model.chat(history.to_request("llama3.1").build()?).await?;
 history.record_response(&response);
-
-store.save("user-42", history.into_messages()).await?;   // persist
+store.save("user-42", history.into_messages()).await?;  // persist
 ```
 
-Implement `ChatStore` yourself for Redis/Postgres/files — the same async,
-object-safe shape as `TraceStore`. (Multi-turn agents: feed
-`history.messages().to_vec()` into `agent.run_messages(...)` and store the
-returned `outcome.messages`.)
+Implementing it for a real backend is a thin wrapper over Option A:
+
+```rust
+struct PgChatStore { /* connection pool */ }
+
+impl ChatStore for PgChatStore {
+    async fn load(&self, session: &str) -> ai_core::Result<Vec<ai_core::Message>> {
+        let json: String = /* SELECT messages FROM sessions WHERE id = $1 */;
+        Ok(serde_json::from_str(&json)?)
+    }
+    async fn save(&self, session: &str, messages: Vec<ai_core::Message>) -> ai_core::Result<()> {
+        let json = serde_json::to_string(&messages)?;
+        /* UPSERT sessions (id, messages) VALUES ($1, $2) */
+        Ok(())
+    }
+    async fn append(&self, session: &str, message: ai_core::Message) -> ai_core::Result<()> {
+        /* append to the row */ Ok(())
+    }
+    async fn clear(&self, session: &str) -> ai_core::Result<()> {
+        /* DELETE FROM sessions WHERE id = $1 */ Ok(())
+    }
+}
+```
+
+**Why:** the trait is a thin, swappable interface over Option A — useful when
+several parts of the app persist conversations and you want one seam (and a
+mockable `InMemoryChatStore` in tests).
+
+### Agent transcripts
+
+An agent run returns the full transcript — *including tool calls and results* —
+as `outcome.messages`. Persist it like any `Vec<Message>` and resume with
+`run_messages`:
+
+```rust
+let outcome = agent.run("Plan my week").await?;
+my_db.put("agent-7", &serde_json::to_string(&outcome.messages)?).await?;
+
+// later, in a new process:
+let prior: Vec<ai_core::Message> = serde_json::from_str(&my_db.get("agent-7").await?)?;
+let outcome = agent.run_messages(prior).await?;   // continues — tools and all
+```
+
+**Why:** lossless resume of multi-step agent conversations; tool calls/results
+are `ContentBlock` variants that round-trip cleanly.
+
+### Decision traces
+
+`TraceEvent` is serde too. Either `drain()` a `RecordingTracer` into your own
+store, or use a `TraceStore` (`InMemoryTraceStore` built in) with
+`persist_recording`:
+
+```rust
+let events = tracer.drain();                       // Vec<TraceEvent>, serde-serializable
+my_db.put("trace-9", &serde_json::to_string(&events)?).await?;   // your audit log
+```
+
+**Why:** a durable, queryable audit of every LLM decision, in whatever store you
+already run.
+
+### Which should I use?
+
+- **DIY serde (A)** for the simplest path and total control — you own the schema.
+- **`ChatStore` / `TraceStore` traits (B)** when you want a uniform, swappable
+  interface or are sharing the pattern across the app.
+
+They're the same underneath; the traits add an interface, not capability.
 
 ## Composing pipelines (Runnable)
 
