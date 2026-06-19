@@ -1,0 +1,347 @@
+* {
+  box-sizing: border-box;
+}
+
+:root {
+  color-scheme: light;
+}
+
+body {
+  margin: 0;
+}
+
+.shell {
+  display: flex;
+  min-height: 100vh;
+  background: #f7f7f9;
+  color: #1c1b22;
+  font-family: system-ui, sans-serif;
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+/* --- sidebar nav --- */
+.nav {
+  width: 220px;
+  flex: 0 0 220px;
+  background: #14131a;
+  color: #cfcdd6;
+  padding: 1.25rem 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.brand {
+  font-weight: 700;
+  font-size: 1.1rem;
+  color: #fff;
+  padding: 0 0.6rem 1rem;
+}
+
+.brand span {
+  color: #aa7bff;
+  font-weight: 500;
+}
+
+.navlink {
+  display: block;
+  padding: 0.5rem 0.6rem;
+  border-radius: 8px;
+  color: #cfcdd6;
+  text-decoration: none;
+  font-size: 0.95rem;
+}
+
+.navlink:hover {
+  background: #221f2c;
+  color: #fff;
+}
+
+.navlink.active {
+  background: #6d28d9;
+  color: #fff;
+}
+
+.footnote {
+  margin-top: auto;
+  padding: 0.6rem;
+  font-size: 0.72rem;
+  color: #6f6b7a;
+}
+
+/* --- content --- */
+.content {
+  flex: 1;
+  padding: 2rem 2.5rem;
+  overflow-y: auto;
+  max-height: 100vh;
+}
+
+.feature {
+  max-width: 760px;
+}
+
+.feature h1 {
+  font-size: 1.5rem;
+  margin: 0 0 0.5rem;
+}
+
+.blurb {
+  color: #555;
+  margin: 0 0 1rem;
+}
+
+.how {
+  background: #fff;
+  border: 1px solid #e5e4e7;
+  border-radius: 10px;
+  padding: 0.5rem 0.9rem;
+  margin-bottom: 1.25rem;
+}
+
+.how summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: #6d28d9;
+}
+
+.howbody {
+  padding-top: 0.5rem;
+}
+
+.howbody p {
+  margin: 0.5rem 0;
+}
+
+pre {
+  background: #14131a;
+  color: #e7e5ee;
+  padding: 0.8rem 1rem;
+  border-radius: 8px;
+  overflow-x: auto;
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+code {
+  background: #efeef2;
+  border-radius: 4px;
+  padding: 0.05rem 0.3rem;
+  font-size: 0.85em;
+}
+
+pre code {
+  background: none;
+  padding: 0;
+}
+
+/* --- overview cards --- */
+.cards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+.card {
+  display: block;
+  background: #fff;
+  border: 1px solid #e5e4e7;
+  border-radius: 10px;
+  padding: 0.9rem 1rem;
+  text-decoration: none;
+  color: inherit;
+}
+
+.card:hover {
+  border-color: #6d28d9;
+  box-shadow: 0 2px 10px rgba(109, 40, 217, 0.1);
+}
+
+.card h3 {
+  margin: 0 0 0.3rem;
+  font-size: 1rem;
+  color: #6d28d9;
+}
+
+.card p {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #666;
+}
+
+/* --- demo widgets --- */
+.demo {
+  background: #fff;
+  border: 1px solid #e5e4e7;
+  border-radius: 10px;
+  padding: 1rem;
+}
+
+.row {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.row input {
+  flex: 1;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  font-size: 0.95rem;
+}
+
+.row button {
+  padding: 0.5rem 1rem;
+  border: none;
+  border-radius: 8px;
+  background: #6d28d9;
+  color: #fff;
+  font-size: 0.95rem;
+  cursor: pointer;
+}
+
+.row button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.error {
+  color: #b00020;
+  margin: 0.6rem 0 0;
+}
+
+.hint {
+  color: #999;
+}
+
+/* --- chat log --- */
+.log {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  min-height: 200px;
+  max-height: 50vh;
+  overflow-y: auto;
+  margin-bottom: 0.75rem;
+}
+
+.msg {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.msg .who {
+  flex: 0 0 2.5rem;
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  color: #999;
+  padding-top: 0.2rem;
+}
+
+.msg.user .text {
+  font-weight: 600;
+}
+
+.msg .text {
+  white-space: pre-wrap;
+}
+
+/* --- results (agent / structured / logs) --- */
+.result {
+  margin-top: 1rem;
+  border-top: 1px solid #eee;
+  padding-top: 1rem;
+}
+
+.meta {
+  color: #888;
+  font-size: 0.85rem;
+}
+
+.transcript {
+  list-style: none;
+  padding: 0;
+  margin: 0.5rem 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.tmsg {
+  border: 1px solid #eee;
+  border-radius: 8px;
+  padding: 0.5rem 0.7rem;
+}
+
+.tmsg .role {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  color: #999;
+}
+
+.block {
+  margin-top: 0.25rem;
+}
+
+.block.tool-use {
+  color: #6d28d9;
+}
+
+.block.tool-result {
+  color: #0a7d33;
+}
+
+.fields {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-bottom: 0.75rem;
+}
+
+.field {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.field .key {
+  flex: 0 0 7rem;
+  color: #888;
+  font-size: 0.85rem;
+}
+
+.field .val {
+  font-weight: 600;
+}
+
+.json {
+  font-size: 0.8rem;
+}
+
+/* --- logs table --- */
+table.logs {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+}
+
+table.logs th,
+table.logs td {
+  text-align: left;
+  padding: 0.4rem 0.5rem;
+  border-bottom: 1px solid #eee;
+  vertical-align: top;
+}
+
+table.logs th {
+  color: #888;
+  font-weight: 600;
+}
+
+tr.llm_request code {
+  color: #6d28d9;
+}
+
+tr.llm_response code {
+  color: #0a7d33;
+}
