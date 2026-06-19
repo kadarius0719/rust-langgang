@@ -225,6 +225,20 @@ pub struct Parallel<R> {
 /// to `Box<dyn DynRunnable>` (which is itself a `Runnable`), or use
 /// [`parallel_map`].
 ///
+/// Note that `from_fn(a)` and `from_fn(b)` with *different* closures are
+/// *different* types, so they cannot share a `Vec`. A function returning a
+/// single `impl Runnable` gives every call the same type:
+///
+/// ```
+/// use ai_core::{from_fn, parallel, Error, Runnable};
+///
+/// fn scaler(factor: i64) -> impl Runnable<In = i64, Out = i64> {
+///     from_fn(move |n: i64| async move { Ok::<_, Error>(n * factor) })
+/// }
+/// let fan = parallel(vec![scaler(2), scaler(3), scaler(10)]);
+/// // fan.invoke(7).await == Ok(vec![14, 21, 70])
+/// ```
+///
 /// [`erase`]: RunnableExt::erase
 pub fn parallel<R: Runnable>(runnables: Vec<R>) -> Parallel<R> {
     Parallel { runnables }
