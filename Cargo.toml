@@ -1,0 +1,26 @@
+[workspace]
+resolver = "2"
+members = ["crates/ai-core"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.82"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/beaumorton/ai"
+
+# Single source of truth for dependency versions across the workspace.
+# Provider/HTTP/schema deps are declared here but only pulled in when the
+# corresponding feature is enabled on a member crate.
+[workspace.dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+futures = "0.3"
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "stream"] }
+tokio = { version = "1", default-features = false }
+schemars = "0.8"
+async-stream = "0.3"
+eventsource-stream = "0.2"
+tracing = "0.1"
+wiremock = "0.6"

@@ -1,0 +1,70 @@
+[package]
+name = "ai-core"
+description = "A small, composable, provider-agnostic AI layer for Rust (chat, tools, structured output, streaming)."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+futures = { workspace = true }
+
+# Optional / feature-gated. Nothing here is pulled in by `default`.
+reqwest = { workspace = true, optional = true }
+tokio = { workspace = true, optional = true }
+schemars = { workspace = true, optional = true }
+async-stream = { workspace = true, optional = true }
+eventsource-stream = { workspace = true, optional = true }
+tracing = { workspace = true, optional = true }
+
+[features]
+default = []
+
+# Shared HTTP machinery for network-backed providers.
+http = ["dep:reqwest", "dep:async-stream"]
+
+# Providers. `ollama` and `bedrock` reuse the http stack; `openai`/`anthropic`
+# additionally need SSE parsing. The OpenAI-compatible adapter (configurable
+# base_url) also covers local runners (llama.cpp server, LM Studio) and many
+# hosted gateways, so "offline via local HTTP" rides on `openai`/`ollama`.
+openai = ["http", "dep:eventsource-stream"]
+ollama = ["http"]
+anthropic = ["http", "dep:eventsource-stream"]
+bedrock = ["http"]
+all-providers = ["openai", "ollama", "anthropic", "bedrock"]
+
+# JSON-Schema derivation for tool params + typed structured output.
+schema = ["dep:schemars"]
+
+# Thin blocking convenience over the async surface.
+blocking = ["dep:tokio", "tokio/rt", "tokio/rt-multi-thread"]
+
+# Bridge structured trace events to the `tracing` crate (spans/events/OTel).
+tracing = ["dep:tracing"]
+
+full = ["all-providers", "schema", "blocking", "tracing"]
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["macros", "rt", "rt-multi-thread"] }
+futures = { workspace = true }
+serde_json = { workspace = true }
+wiremock = { workspace = true }
+
+[[test]]
+name = "openai"
+required-features = ["openai"]
+
+[[example]]
+name = "chat"
+required-features = ["openai"]
+
+[[example]]
+name = "streaming"
+required-features = ["openai"]
+
+[package.metadata.docs.rs]
+all-features = true
