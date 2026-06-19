@@ -99,7 +99,9 @@ impl ChatStream {
         I::IntoIter: Send + 'static,
     {
         Self::new(futures::stream::iter(
-            events.into_iter().map(|event| -> Result<StreamEvent> { Ok(event) }),
+            events
+                .into_iter()
+                .map(|event| -> Result<StreamEvent> { Ok(event) }),
         ))
     }
 

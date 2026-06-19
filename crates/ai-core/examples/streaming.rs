@@ -7,7 +7,6 @@
 use std::io::Write;
 
 use ai_core::{ChatModel, ChatRequest, OpenAiClient, StreamEvent};
-use futures::StreamExt;
 
 #[tokio::main]
 async fn main() -> ai_core::Result<()> {
