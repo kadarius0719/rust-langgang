@@ -51,12 +51,18 @@ full = ["all-providers", "schema", "blocking", "tracing"]
 [dev-dependencies]
 tokio = { workspace = true, features = ["macros", "rt", "rt-multi-thread"] }
 futures = { workspace = true }
+serde = { workspace = true }
 serde_json = { workspace = true }
+schemars = { workspace = true }
 wiremock = { workspace = true }
 
 [[test]]
 name = "openai"
 required-features = ["openai"]
+
+[[test]]
+name = "smoke"
+required-features = ["schema"]
 
 [[example]]
 name = "chat"

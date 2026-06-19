@@ -1,0 +1,9 @@
+#!/bin/sh
+# Pre-push gate: run the same checks CI enforces (see Makefile / ci.yml), so
+# formatting and lint failures are caught locally instead of on a PR.
+#
+# Enable once per clone:
+#   git config core.hooksPath .githooks
+#
+# Bypass for a single push if needed: `git push --no-verify`.
+exec make ci

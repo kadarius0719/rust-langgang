@@ -108,6 +108,15 @@ cargo test                              # default features (no providers)
 cargo test --features full              # everything
 cargo clippy --all-targets -- -D warnings
 cargo fmt --all
+
+make ci                                 # the full gate CI runs (fmt + clippy + tests)
+```
+
+`make ci` mirrors the CI `test` job. To run it automatically before every push,
+enable the committed hook once per clone:
+
+```sh
+git config core.hooksPath .githooks
 ```
 
 ## License
