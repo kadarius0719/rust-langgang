@@ -111,10 +111,13 @@ pub use trace::{
 
 /// The common imports for typical use.
 pub mod prelude {
+    #[cfg(feature = "schema")]
+    pub use crate::StructuredExt;
     pub use crate::{
-        Agent, ChatHistory, ChatModel, ChatModelExt, ChatRequest, ChatResponse, ContentBlock,
-        Error, Message, Result, Role, Runnable, RunnableExt, StreamEvent, Tool, ToolBox, ToolDef,
-        TraceEvent, Traced, Tracer, Usage,
+        from_fn, parallel, Agent, ChatHistory, ChatModel, ChatModelExt, ChatRequest, ChatResponse,
+        ChatStore, ChatStream, ContentBlock, Error, FnTool, InMemoryChatStore, Message, Result,
+        Role, Runnable, RunnableExt, StopReason, StreamEvent, Tool, ToolBox, ToolDef, TraceEvent,
+        Traced, Tracer, Usage,
     };
 }
 
