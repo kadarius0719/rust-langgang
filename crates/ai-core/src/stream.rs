@@ -69,6 +69,101 @@ impl ChatStream {
         }
     }
 
+    /// A stream of a single event.
+    ///
+    /// ```
+    /// use ai_core::{ChatStream, StreamEvent};
+    /// let stream = ChatStream::once(StreamEvent::TextDelta("hi".into()));
+    /// ```
+    pub fn once(event: StreamEvent) -> Self {
+        Self::from_events([event])
+    }
+
+    /// A stream replaying a fixed sequence of events.
+    ///
+    /// The caller needs no `futures` dependency to build a stream — handy for
+    /// tests and for custom/in-process [`ChatModel`](crate::ChatModel)s. For a
+    /// mid-stream error, use [`new`](Self::new) with your own fallible stream.
+    ///
+    /// ```
+    /// use ai_core::{ChatStream, StreamEvent};
+    /// let stream = ChatStream::from_events([
+    ///     StreamEvent::MessageStart,
+    ///     StreamEvent::TextDelta("hello".into()),
+    ///     StreamEvent::MessageStop,
+    /// ]);
+    /// ```
+    pub fn from_events<I>(events: I) -> Self
+    where
+        I: IntoIterator<Item = StreamEvent>,
+        I::IntoIter: Send + 'static,
+    {
+        Self::new(futures::stream::iter(
+            events
+                .into_iter()
+                .map(|event| -> Result<StreamEvent> { Ok(event) }),
+        ))
+    }
+
+    /// Replay a complete [`ChatResponse`] as a stream of events.
+    ///
+    /// The inverse of [`collect_response`](Self::collect_response): a backend
+    /// that only produces a finished response can still satisfy
+    /// [`ChatModel::stream`](crate::ChatModel::stream) by replaying it, and
+    /// `from_response(r).collect_response()` reproduces `r`.
+    pub fn from_response(response: ChatResponse) -> Self {
+        let mut events = vec![StreamEvent::MessageStart];
+        let mut tool_index = 0usize;
+        for block in response.message.content {
+            match block {
+                ContentBlock::Text { text } => events.push(StreamEvent::TextDelta(text)),
+                ContentBlock::Thinking { text, .. } => {
+                    events.push(StreamEvent::ThinkingDelta(text));
+                }
+                ContentBlock::ToolUse { id, name, args } => {
+                    events.push(StreamEvent::ToolCallStart {
+                        index: tool_index,
+                        id,
+                        name,
+                    });
+                    events.push(StreamEvent::ToolCallArgsDelta {
+                        index: tool_index,
+                        delta: args.to_string(),
+                    });
+                    tool_index += 1;
+                }
+                _ => {}
+            }
+        }
+        if response.usage != Usage::default() {
+            events.push(StreamEvent::Usage(response.usage));
+        }
+        if let Some(reason) = response.stop_reason {
+            events.push(StreamEvent::Stop(reason));
+        }
+        events.push(StreamEvent::MessageStop);
+        Self::from_events(events)
+    }
+
+    /// Pull the next event, or `None` at end of stream.
+    ///
+    /// An inherent convenience so callers can drive a stream token-by-token
+    /// without importing `futures::StreamExt`. ([`ChatStream`] also implements
+    /// [`futures::Stream`], so the full `StreamExt` combinator set remains
+    /// available to callers who want it.)
+    ///
+    /// ```ignore
+    /// let mut stream = model.stream(request).await?;
+    /// while let Some(event) = stream.next().await {
+    ///     if let StreamEvent::TextDelta(text) = event? {
+    ///         print!("{text}");
+    ///     }
+    /// }
+    /// ```
+    pub async fn next(&mut self) -> Option<Result<StreamEvent>> {
+        self.inner.next().await
+    }
+
     /// Drain the stream and accumulate it into a complete [`ChatResponse`].
     ///
     /// This is how [`crate::ChatModel::chat`] is built atop `stream`.
@@ -166,5 +261,82 @@ impl ResponseAccumulator {
             model: None,
             raw: serde_json::Value::Null,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn from_events_needs_no_futures_dep() {
+        let response = ChatStream::from_events([
+            StreamEvent::MessageStart,
+            StreamEvent::TextDelta("hel".into()),
+            StreamEvent::TextDelta("lo".into()),
+            StreamEvent::MessageStop,
+        ])
+        .collect_response()
+        .await
+        .unwrap();
+        assert_eq!(response.text(), "hello");
+    }
+
+    #[tokio::test]
+    async fn next_drives_stream_without_streamext_import() {
+        // Note: this module does not import `futures::StreamExt`, so `next`
+        // here resolves to the inherent method.
+        let mut stream = ChatStream::from_events([
+            StreamEvent::TextDelta("a".into()),
+            StreamEvent::TextDelta("b".into()),
+        ]);
+        let mut seen = String::new();
+        while let Some(event) = stream.next().await {
+            if let StreamEvent::TextDelta(s) = event.unwrap() {
+                seen.push_str(&s);
+            }
+        }
+        assert_eq!(seen, "ab");
+    }
+
+    #[tokio::test]
+    async fn once_yields_single_event() {
+        let response = ChatStream::once(StreamEvent::TextDelta("hi".into()))
+            .collect_response()
+            .await
+            .unwrap();
+        assert_eq!(response.text(), "hi");
+    }
+
+    #[tokio::test]
+    async fn from_response_round_trips_through_collect() {
+        let original = ChatResponse {
+            message: Message {
+                role: Role::Assistant,
+                content: vec![
+                    ContentBlock::text("the answer is"),
+                    ContentBlock::ToolUse {
+                        id: "call_1".into(),
+                        name: "get_weather".into(),
+                        args: serde_json::json!({"city": "Paris"}),
+                    },
+                ],
+            },
+            usage: Usage {
+                input_tokens: 10,
+                output_tokens: 5,
+                ..Usage::default()
+            },
+            stop_reason: Some(StopReason::ToolUse),
+            model: None,
+            raw: serde_json::Value::Null,
+        };
+
+        let replayed = ChatStream::from_response(original.clone())
+            .collect_response()
+            .await
+            .unwrap();
+
+        assert_eq!(replayed, original);
     }
 }
