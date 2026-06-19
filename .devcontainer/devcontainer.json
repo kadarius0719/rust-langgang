@@ -1,0 +1,24 @@
+{
+  "name": "ai-core examples",
+  "image": "mcr.microsoft.com/devcontainers/rust:1-bookworm",
+  "features": {
+    "ghcr.io/devcontainers/features/node:1": { "version": "22" }
+  },
+  "forwardPorts": [5173, 8080, 9000, 11434],
+  "portsAttributes": {
+    "5173": { "label": "web-ui frontend", "onAutoForward": "notify" },
+    "8080": { "label": "web-ui backend" },
+    "9000": { "label": "mcp server" },
+    "11434": { "label": "ollama" }
+  },
+  "postCreateCommand": "bash .devcontainer/post-create.sh",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "rust-lang.rust-analyzer",
+        "tamasfe.even-better-toml",
+        "dbaeumer.vscode-eslint"
+      ]
+    }
+  }
+}
