@@ -1,6 +1,9 @@
 [workspace]
 resolver = "2"
 members = ["crates/ai-core"]
+# Standalone runnable examples (own deps: axum, sqlx, …); kept out of the
+# workspace so they don't bloat the core build, CI, or the feature powerset.
+exclude = ["examples"]
 
 [workspace.package]
 version = "0.1.0"
