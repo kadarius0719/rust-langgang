@@ -4,6 +4,7 @@ import Overview from "./pages/Overview";
 import Chat from "./pages/Chat";
 import Agent from "./pages/Agent";
 import Structured from "./pages/Structured";
+import Mcp from "./pages/Mcp";
 import Memory from "./pages/Memory";
 import Logging from "./pages/Logging";
 
@@ -12,6 +13,7 @@ const NAV: { to: string; label: string; end?: boolean }[] = [
   { to: "/chat", label: "Streaming Chat" },
   { to: "/agent", label: "Agent & Tools" },
   { to: "/structured", label: "Structured Output" },
+  { to: "/mcp", label: "MCP Tools" },
   { to: "/memory", label: "Memory" },
   { to: "/logging", label: "Logging & Traces" },
 ];
@@ -44,6 +46,7 @@ export default function App() {
             <Route path="/chat" element={<Chat />} />
             <Route path="/agent" element={<Agent />} />
             <Route path="/structured" element={<Structured />} />
+            <Route path="/mcp" element={<Mcp />} />
             <Route path="/memory" element={<Memory />} />
             <Route path="/logging" element={<Logging />} />
           </Routes>

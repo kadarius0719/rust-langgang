@@ -8,6 +8,7 @@ demonstrates each of the crate's capabilities on its own page:
 | Streaming Chat | token-by-token `ChatModel::stream` over SSE | `POST /api/chat/stream` |
 | Agent & Tools | an `Agent` tool-calling loop + the decision transcript | `POST /api/agent` |
 | Structured Output | `model.structured::<T>()` into a typed Rust struct | `POST /api/structured` |
+| MCP Tools | an `Agent` whose tools come from an [MCP](../mcp) server (the backend is also an MCP client) | `GET /api/mcp/tools`, `POST /api/mcp/agent` |
 | Memory | per-session `ChatHistory` + `ChatStore` (in-memory or SQLite) | `GET /api/history/{session}` |
 | Logging & Traces | structured `TraceEvent`s from a non-invasive `Tracer` | `GET /api/logs` |
 
@@ -41,6 +42,12 @@ npm run dev      # http://localhost:5173
 ```
 
 Open <http://localhost:5173> and click through the sidebar.
+
+The **MCP Tools** page additionally needs the MCP server from the sibling example:
+
+```sh
+cd examples/mcp && cargo run --bin mcp-server   # serves tools on :9000
+```
 
 ## Quick API smoke (no UI)
 

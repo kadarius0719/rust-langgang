@@ -6,6 +6,10 @@
 //!   GET  /api/health            -> liveness
 //!   POST /api/chat              -> non-streaming chat {prompt, session?} -> {text, usage}
 //!   POST /api/chat/stream       -> SSE token stream    {prompt, session?} -> data: {"text": "..."}
+//!   POST /api/agent             -> Agent tool-loop (local FnTools)
+//!   POST /api/structured        -> structured output into a typed struct
+//!   GET  /api/mcp/tools         -> tools advertised by the configured MCP server
+//!   POST /api/mcp/agent         -> Agent whose tools are sourced from the MCP server
 //!   GET  /api/history/{session} -> the stored conversation for a session
 //!   GET  /api/logs              -> the recorded trace events
 
@@ -16,7 +20,7 @@ use std::sync::Arc;
 use ai_core::{
     Agent, ChatHistory, ChatModel, ChatModelExt, ChatRequest, ChatStore, DynChatStore, FnTool,
     InMemoryChatStore, Message, OpenAiClient, OpenAiModel, RecordingTracer, StreamEvent,
-    StructuredExt, ToolDef, TraceEvent, Traced, Tracer,
+    StructuredExt, ToolBox, ToolDef, TraceEvent, Traced, Tracer,
 };
 use axum::{
     extract::{Path, State},
@@ -34,6 +38,8 @@ use serde_json::json;
 use sqlx::sqlite::SqliteConnectOptions;
 use sqlx::SqlitePool;
 use tower_http::cors::CorsLayer;
+
+mod mcp;
 
 const OLLAMA_V1: &str = "http://localhost:11434/v1";
 const MODEL: &str = "llama3.2:1b";
@@ -178,6 +184,8 @@ struct AppState {
     /// Conversation memory — runtime-selected backend behind ai-core's facade.
     store: Arc<dyn DynChatStore>,
     model_id: String,
+    /// URL of the MCP server whose tools the `/api/mcp/*` endpoints use.
+    mcp_url: String,
 }
 
 #[derive(Deserialize)]
@@ -239,11 +247,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     };
 
+    let mcp_url =
+        std::env::var("MCP_URL").unwrap_or_else(|_| "http://127.0.0.1:9000/mcp".to_string());
+    println!("mcp tools from: {mcp_url} (run the examples/mcp server to enable /api/mcp/*)");
+
     let state = AppState {
         model,
         logs,
         store,
         model_id: MODEL.to_string(),
+        mcp_url,
     };
 
     let app = Router::new()
@@ -252,6 +265,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/api/chat/stream", post(chat_stream))
         .route("/api/agent", post(run_agent))
         .route("/api/structured", post(structured))
+        .route("/api/mcp/tools", get(mcp_tools))
+        .route("/api/mcp/agent", post(mcp_agent))
         .route("/api/history/{session}", get(history))
         .route("/api/logs", get(get_logs))
         .with_state(state)
@@ -429,4 +444,63 @@ async fn history(
 /// Inspect the recorded trace events (logging).
 async fn get_logs(State(state): State<AppState>) -> Json<Vec<TraceEvent>> {
     Json(state.logs.events())
+}
+
+#[derive(Serialize)]
+struct McpToolView {
+    name: String,
+    description: String,
+}
+
+/// Map an MCP/transport error into a 500 (e.g. the MCP server isn't running).
+fn mcp_err(err: mcp::BoxErr) -> AppError {
+    AppError(ai_core::Error::tool(err.to_string()))
+}
+
+/// List the tools advertised by the configured MCP server.
+async fn mcp_tools(State(state): State<AppState>) -> Result<Json<Vec<McpToolView>>, AppError> {
+    let client = mcp::McpClient::connect(&state.mcp_url)
+        .await
+        .map_err(mcp_err)?;
+    let tools = client.list_tools().await.map_err(mcp_err)?;
+    Ok(Json(
+        tools
+            .into_iter()
+            .map(|t| McpToolView {
+                name: t.name,
+                description: t.description,
+            })
+            .collect(),
+    ))
+}
+
+/// Run an Agent whose entire ToolBox is sourced from the MCP server.
+async fn mcp_agent(
+    State(state): State<AppState>,
+    Json(body): Json<ChatIn>,
+) -> Result<Json<AgentOut>, AppError> {
+    let client = Arc::new(
+        mcp::McpClient::connect(&state.mcp_url)
+            .await
+            .map_err(mcp_err)?,
+    );
+    let mut tools = ToolBox::new();
+    for info in client.list_tools().await.map_err(mcp_err)? {
+        tools.add(mcp::McpTool::new(
+            client.clone(),
+            ToolDef::new(info.name, info.description, info.input_schema),
+        ));
+    }
+
+    let agent = Agent::new(state.model.clone())
+        .system("Use the available tools when relevant, then answer in one short sentence.")
+        .tools(tools)
+        .max_steps(5);
+    let outcome = agent.run(body.prompt).await?;
+    Ok(Json(AgentOut {
+        answer: outcome.text(),
+        steps: outcome.steps,
+        stopped: format!("{:?}", outcome.stopped),
+        transcript: outcome.messages,
+    }))
 }
