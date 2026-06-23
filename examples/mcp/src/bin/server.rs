@@ -14,6 +14,8 @@ const ADDR: &str = "127.0.0.1:9000";
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let _ = dotenvy::dotenv();
+
     let app = Router::new().route("/mcp", post(handle));
     let listener = tokio::net::TcpListener::bind(ADDR).await?;
     println!("MCP server (streamable HTTP) listening on http://{ADDR}/mcp");

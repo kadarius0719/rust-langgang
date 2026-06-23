@@ -66,6 +66,8 @@ pub mod agent;
 pub mod auth;
 pub mod error;
 pub mod history;
+#[cfg(feature = "http")]
+pub mod mcp;
 pub mod memory;
 pub mod message;
 pub mod middleware;
@@ -87,6 +89,11 @@ pub use agent::{Agent, AgentOutcome, StopCause};
 pub use auth::{ApiKeyAuth, Auth, BearerAuth, NoAuth};
 pub use error::{ApiErrorKind, Error, Result};
 pub use history::{ChatHistory, ChatStore, DynChatStore, InMemoryChatStore};
+#[cfg(feature = "http")]
+pub use mcp::{
+    default_server_label, load_mcp_tools, sanitize_server_label, McpClient, McpLoadReport, McpTool,
+    McpToolInfo,
+};
 pub use memory::{DynTraceStore, InMemoryTraceStore, TraceStore};
 pub use message::{ContentBlock, ImageSource, Message, Role};
 pub use middleware::{ChatModelExt, MapRequest, MapResponse, WithFallback};

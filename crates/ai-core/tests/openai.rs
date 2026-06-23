@@ -48,6 +48,47 @@ async fn non_streaming_chat_parses_response_and_shapes_request() {
 }
 
 #[tokio::test]
+async fn non_streaming_chat_preserves_reasoning_summaries() {
+    let server = MockServer::start().await;
+    let body = serde_json::json!({
+        "model": "local-model",
+        "choices": [{
+            "message": {
+                "content": "Hello!",
+                "reasoning_details": [
+                    { "type": "reasoning.summary", "summary": "I should answer briefly." }
+                ]
+            },
+            "finish_reason": "stop"
+        }]
+    });
+    Mock::given(method("POST"))
+        .and(path("/v1/chat/completions"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(body))
+        .mount(&server)
+        .await;
+
+    let model = OpenAiClient::local(format!("{}/v1", server.uri())).chat_model("local-model");
+    let response = model.chat(req()).await.unwrap();
+
+    assert_eq!(response.message.content.len(), 2);
+    assert!(matches!(
+        response.message.content[0],
+        ai_core::ContentBlock::Thinking { .. }
+    ));
+    assert!(matches!(
+        response.message.content[1],
+        ai_core::ContentBlock::Text { .. }
+    ));
+    match &response.message.content[0] {
+        ai_core::ContentBlock::Thinking { text, .. } => {
+            assert_eq!(text, "I should answer briefly.")
+        }
+        other => panic!("expected thinking block, got {other:?}"),
+    }
+}
+
+#[tokio::test]
 async fn streaming_chat_accumulates() {
     let server = MockServer::start().await;
     let c1 = serde_json::json!({"choices": [{"delta": {"content": "Hel"}}]}).to_string();
