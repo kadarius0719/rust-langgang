@@ -399,7 +399,7 @@ fn wrapped_line_count<'a>(lines: &[Line<'a>], width: u16) -> usize {
             if line_width == 0 {
                 1
             } else {
-                (line_width + width - 1) / width
+                line_width.div_ceil(width)
             }
         })
         .sum()

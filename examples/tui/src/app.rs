@@ -34,19 +34,14 @@ pub struct RenderMessage {
     pub blocks: Vec<RenderBlock>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum ScrollState {
+    #[default]
     FollowLatest,
     Manual {
         scroll_offset: u16,
         pending_new_content: bool,
     },
-}
-
-impl Default for ScrollState {
-    fn default() -> Self {
-        Self::FollowLatest
-    }
 }
 
 impl ScrollState {
@@ -309,11 +304,7 @@ impl App {
     }
 }
 
-fn build_model(
-    model_name: &str,
-    api_key: Option<String>,
-    base_url: Option<String>,
-) -> OpenAiModel {
+fn build_model(model_name: &str, api_key: Option<String>, base_url: Option<String>) -> OpenAiModel {
     match (api_key, base_url) {
         (Some(key), Some(base_url)) => {
             // OpenAI-compatible endpoint with custom base URL and bearer auth.
@@ -355,6 +346,51 @@ fn mcp_server_urls() -> Vec<(String, String)> {
         .or_else(|| Some("http://localhost:8811/mcp".to_string()))
         .map(|url| vec![(default_server_label(0), url)])
         .unwrap_or_default()
+}
+
+fn render_messages(messages: &[Message]) -> Vec<RenderMessage> {
+    let mut rendered = Vec::new();
+
+    for message in messages {
+        let mut blocks = Vec::new();
+        for block in &message.content {
+            match block {
+                ContentBlock::Text { text } if !text.trim().is_empty() => {
+                    blocks.push(RenderBlock::Text(text.clone()));
+                }
+                ContentBlock::Thinking { text, .. } if !text.trim().is_empty() => {
+                    blocks.push(RenderBlock::Thinking(text.clone()));
+                }
+                ContentBlock::ToolUse { name, args, .. } => {
+                    blocks.push(RenderBlock::ToolUse {
+                        name: name.clone(),
+                        args: args.to_string(),
+                    });
+                }
+                ContentBlock::ToolResult {
+                    tool_use_id,
+                    content,
+                    is_error,
+                } => {
+                    blocks.push(RenderBlock::ToolResult {
+                        tool_use_id: tool_use_id.clone(),
+                        content: content.clone(),
+                        is_error: *is_error,
+                    });
+                }
+                _ => {}
+            }
+        }
+
+        if !blocks.is_empty() {
+            rendered.push(RenderMessage {
+                role: message.role,
+                blocks,
+            });
+        }
+    }
+
+    rendered
 }
 
 #[cfg(test)]
@@ -455,49 +491,4 @@ mod tests {
         let model = build_model("demo", None, Some("http://example.com/v1".to_string()));
         let _ = model;
     }
-}
-
-fn render_messages(messages: &[Message]) -> Vec<RenderMessage> {
-    let mut rendered = Vec::new();
-
-    for message in messages {
-        let mut blocks = Vec::new();
-        for block in &message.content {
-            match block {
-                ContentBlock::Text { text } if !text.trim().is_empty() => {
-                    blocks.push(RenderBlock::Text(text.clone()));
-                }
-                ContentBlock::Thinking { text, .. } if !text.trim().is_empty() => {
-                    blocks.push(RenderBlock::Thinking(text.clone()));
-                }
-                ContentBlock::ToolUse { name, args, .. } => {
-                    blocks.push(RenderBlock::ToolUse {
-                        name: name.clone(),
-                        args: args.to_string(),
-                    });
-                }
-                ContentBlock::ToolResult {
-                    tool_use_id,
-                    content,
-                    is_error,
-                } => {
-                    blocks.push(RenderBlock::ToolResult {
-                        tool_use_id: tool_use_id.clone(),
-                        content: content.clone(),
-                        is_error: *is_error,
-                    });
-                }
-                _ => {}
-            }
-        }
-
-        if !blocks.is_empty() {
-            rendered.push(RenderMessage {
-                role: message.role,
-                blocks,
-            });
-        }
-    }
-
-    rendered
 }
