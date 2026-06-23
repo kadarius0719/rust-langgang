@@ -61,6 +61,10 @@ name = "openai"
 required-features = ["openai"]
 
 [[test]]
+name = "mcp"
+required-features = ["http"]
+
+[[test]]
 name = "smoke"
 required-features = ["schema"]
 

@@ -19,8 +19,8 @@ use std::sync::Arc;
 
 use ai_core::{
     Agent, ChatHistory, ChatModel, ChatModelExt, ChatRequest, ChatStore, DynChatStore, FnTool,
-    InMemoryChatStore, Message, OpenAiClient, OpenAiModel, RecordingTracer, StreamEvent,
-    StructuredExt, ToolBox, ToolDef, TraceEvent, Traced, Tracer,
+    InMemoryChatStore, McpClient, McpTool, Message, OpenAiClient, OpenAiModel, RecordingTracer,
+    StreamEvent, StructuredExt, ToolBox, ToolDef, TraceEvent, Traced, Tracer,
 };
 use axum::{
     extract::{Path, State},
@@ -38,8 +38,6 @@ use serde_json::json;
 use sqlx::sqlite::SqliteConnectOptions;
 use sqlx::SqlitePool;
 use tower_http::cors::CorsLayer;
-
-mod mcp;
 
 const OLLAMA_V1: &str = "http://localhost:11434/v1";
 const MODEL: &str = "llama3.2:1b";
@@ -228,6 +226,8 @@ impl IntoResponse for AppError {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let _ = dotenvy::dotenv();
+
     let base = OpenAiClient::local(OLLAMA_V1).chat_model(MODEL);
     let logs = RecordingTracer::new();
     // Attach the tracer non-invasively: the model now emits trace events.
@@ -453,15 +453,13 @@ struct McpToolView {
 }
 
 /// Map an MCP/transport error into a 500 (e.g. the MCP server isn't running).
-fn mcp_err(err: mcp::BoxErr) -> AppError {
-    AppError(ai_core::Error::tool(err.to_string()))
+fn mcp_err(err: ai_core::Error) -> AppError {
+    AppError(err)
 }
 
 /// List the tools advertised by the configured MCP server.
 async fn mcp_tools(State(state): State<AppState>) -> Result<Json<Vec<McpToolView>>, AppError> {
-    let client = mcp::McpClient::connect(&state.mcp_url)
-        .await
-        .map_err(mcp_err)?;
+    let client = McpClient::connect(&state.mcp_url).await.map_err(mcp_err)?;
     let tools = client.list_tools().await.map_err(mcp_err)?;
     Ok(Json(
         tools
@@ -479,16 +477,16 @@ async fn mcp_agent(
     State(state): State<AppState>,
     Json(body): Json<ChatIn>,
 ) -> Result<Json<AgentOut>, AppError> {
-    let client = Arc::new(
-        mcp::McpClient::connect(&state.mcp_url)
-            .await
-            .map_err(mcp_err)?,
-    );
+    let client = Arc::new(McpClient::connect(&state.mcp_url).await.map_err(mcp_err)?);
     let mut tools = ToolBox::new();
     for info in client.list_tools().await.map_err(mcp_err)? {
-        tools.add(mcp::McpTool::new(
+        let remote_name = info.name.clone();
+        tools.add(McpTool::new(
             client.clone(),
-            ToolDef::new(info.name, info.description, info.input_schema),
+            info.name,
+            remote_name,
+            info.description,
+            info.input_schema,
         ));
     }
 

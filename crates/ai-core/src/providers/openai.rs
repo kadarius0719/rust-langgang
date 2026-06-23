@@ -499,6 +499,14 @@ fn to_chat_response(parsed: ChatCompletionResponse, raw: Value) -> ChatResponse 
         .unwrap_or_default();
 
     let mut content = Vec::new();
+    for summary in extract_reasoning_summaries(&raw) {
+        if !summary.trim().is_empty() {
+            content.push(ContentBlock::Thinking {
+                text: summary,
+                signature: None,
+            });
+        }
+    }
     if let Some(text) = message.content {
         if !text.is_empty() {
             content.push(ContentBlock::text(text));
@@ -523,6 +531,58 @@ fn to_chat_response(parsed: ChatCompletionResponse, raw: Value) -> ChatResponse 
         stop_reason: finish_reason.map(|r| map_finish_reason(&r)),
         model: parsed.model,
         raw,
+    }
+}
+
+fn extract_reasoning_summaries(raw: &Value) -> Vec<String> {
+    let mut out = Vec::new();
+    let Some(choice) = raw
+        .get("choices")
+        .and_then(Value::as_array)
+        .and_then(|choices| choices.first())
+    else {
+        return out;
+    };
+    let Some(message) = choice.get("message") else {
+        return out;
+    };
+
+    if let Some(details) = message.get("reasoning_details").and_then(Value::as_array) {
+        for detail in details {
+            collect_reasoning_text(detail, &mut out);
+        }
+    }
+    if let Some(reasoning) = message.get("reasoning") {
+        collect_reasoning_text(reasoning, &mut out);
+    }
+    if let Some(summary) = message.get("reasoning_summary") {
+        collect_reasoning_text(summary, &mut out);
+    }
+
+    out
+}
+
+fn collect_reasoning_text(value: &Value, out: &mut Vec<String>) {
+    match value {
+        Value::String(text) => {
+            if !text.trim().is_empty() {
+                out.push(text.clone());
+            }
+        }
+        Value::Array(items) => {
+            for item in items {
+                collect_reasoning_text(item, out);
+            }
+        }
+        Value::Object(map) => {
+            if let Some(summary) = map.get("summary") {
+                collect_reasoning_text(summary, out);
+            }
+            if let Some(text) = map.get("text") {
+                collect_reasoning_text(text, out);
+            }
+        }
+        _ => {}
     }
 }
 
